@@ -69,37 +69,19 @@
 #include "internal.h"
 
 
+int sgx_cpuidex(uint32_t cpuinfo[4], uint32_t leaf, int subleaf);
+
 // OPENSSL_cpuid runs the cpuid instruction. |leaf| is passed in as EAX and ECX
 // is set to zero. It writes EAX, EBX, ECX, and EDX to |*out_eax| through
 // |*out_edx|.
 static void OPENSSL_cpuid(uint32_t *out_eax, uint32_t *out_ebx,
                           uint32_t *out_ecx, uint32_t *out_edx, uint32_t leaf) {
-#if defined(_MSC_VER) && !defined(__clang__)
-  int tmp[4];
-  __cpuid(tmp, (int)leaf);
-  *out_eax = (uint32_t)tmp[0];
-  *out_ebx = (uint32_t)tmp[1];
-  *out_ecx = (uint32_t)tmp[2];
-  *out_edx = (uint32_t)tmp[3];
-#elif defined(__pic__) && defined(OPENSSL_32_BIT)
-  // Inline assembly may not clobber the PIC register. For 32-bit, this is EBX.
-  // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=47602.
-  __asm__ volatile (
-    "xor %%ecx, %%ecx\n"
-    "mov %%ebx, %%edi\n"
-    "cpuid\n"
-    "xchg %%edi, %%ebx\n"
-    : "=a"(*out_eax), "=D"(*out_ebx), "=c"(*out_ecx), "=d"(*out_edx)
-    : "a"(leaf)
-  );
-#else
-  __asm__ volatile (
-    "xor %%ecx, %%ecx\n"
-    "cpuid\n"
-    : "=a"(*out_eax), "=b"(*out_ebx), "=c"(*out_ecx), "=d"(*out_edx)
-    : "a"(leaf)
-  );
-#endif
+    uint32_t c[4] = {0};
+    sgx_cpuidex(c, leaf, 0);
+    *out_eax = c[0];
+    *out_ebx = c[1];
+    *out_ecx = c[2];
+    *out_edx = c[3];
 }
 
 // OPENSSL_xgetbv returns the value of an Intel Extended Control Register (XCR).
